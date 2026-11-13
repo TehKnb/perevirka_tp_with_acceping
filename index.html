@@ -48,13 +48,6 @@
                 <strong data-t="start.clothesLabel"></strong> <span data-t="start.clothesText"></span>
               </p>
             </section>
-            <section class="info-card discord-card">
-              <span class="icon-badge icon-badge-discord" data-icon="discord"></span>
-              <div>
-                <p class="discord-title" data-t="common.discordTitle"></p>
-                <p class="discord-text" data-t="common.discordText"></p>
-              </div>
-            </section>
           </div>
           <aside class="important-card" role="note">
             <span class="important-icon" data-icon="alert"></span>
@@ -295,13 +288,6 @@
               <p class="side-block-text" data-t="common.importantText"></p>
             </div>
           </section>
-          <section class="side-block side-block-tint">
-            <span class="icon-badge icon-badge-discord" data-icon="discord"></span>
-            <div>
-              <p class="side-block-title" data-t="submit.discordTitle"></p>
-              <p class="side-block-text" data-t="submit.discordText"></p>
-            </div>
-          </section>
         </aside>
 
         <dialog class="requirements-dialog" id="requirements-dialog" aria-labelledby="requirements-title">
@@ -313,19 +299,27 @@
         </dialog>
       </section>
 
-      <!-- 5. Готово -->
-      <section class="screen card done-card" data-screen="done" hidden>
-        <div class="done-emoji" aria-hidden="true">🎉</div>
-        <h1 tabindex="-1" data-t="done.title"></h1>
-        <p data-t="done.body"></p>
-        <section class="info-card discord-card">
+      <!-- 5. Відповідь техпідтримки: очікування з таймером, потім «пройдено» / «відхилено» -->
+      <section class="screen card done-card" data-screen="done" data-view="waiting" hidden>
+        <div class="done-emoji" id="review-emoji" aria-hidden="true"></div>
+        <h1 tabindex="-1" id="review-title" aria-live="polite"></h1>
+        <p id="review-body"></p>
+        <div class="review-timer" id="review-timer-box">
+          <span class="review-timer-label" data-t="done.timerLabel"></span>
+          <span class="review-timer-value" id="review-timer" role="timer">15:00</span>
+        </div>
+        <div class="review-reason" id="review-reason-box" hidden>
+          <p class="review-reason-label" data-t="done.reasonLabel"></p>
+          <p class="review-reason-text" id="review-reason"></p>
+        </div>
+        <section class="info-card discord-card" id="review-discord-card" hidden>
           <span class="icon-badge icon-badge-discord" data-icon="discord"></span>
-          <p class="discord-text" data-t="done.discord"></p>
+          <p class="discord-text" id="review-discord-text"></p>
         </section>
         <a class="btn btn-primary btn-icon btn-wide btn-discord" id="done-discord" target="_blank" rel="noopener" hidden>
           <span class="icon" data-icon="discord"></span><span data-t="done.openDiscord"></span>
         </a>
-        <p class="done-early" data-t="done.early"></p>
+        <button type="button" class="btn btn-secondary btn-wide" id="btn-review-retry" data-t="done.retry" hidden></button>
         <p class="test-mode small" id="done-test-mode" data-t="common.testMode" hidden></p>
       </section>
     </main>

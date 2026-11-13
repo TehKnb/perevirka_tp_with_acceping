@@ -50,7 +50,7 @@ describe('api/submit', () => {
     mockTelegram();
     const res = await POST(request());
     expect(res.status).toBe(200);
-    expect(calls.map((c) => c.method)).toEqual(['sendPhoto', 'sendAudio']);
+    expect(calls.map((c) => c.method)).toEqual(['sendPhoto', 'sendAudio', 'sendMessage']);
     const photo = calls[0].fields;
     expect(photo.chat_id).toBe('-100123');
     expect(photo.message_thread_id).toBe('555');
@@ -78,7 +78,7 @@ describe('api/submit', () => {
     mockTelegram({ sendAudio: 'Bad Request: wrong file' });
     const res = await POST(request());
     expect(res.status).toBe(200);
-    expect(calls.map((c) => c.method)).toEqual(['sendPhoto', 'sendAudio', 'sendDocument']);
+    expect(calls.map((c) => c.method)).toEqual(['sendPhoto', 'sendAudio', 'sendDocument', 'sendMessage']);
   });
 
   it('помилка Telegram → 502 без подробиць і токена у відповіді', async () => {

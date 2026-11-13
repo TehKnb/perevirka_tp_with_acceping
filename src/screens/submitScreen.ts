@@ -11,7 +11,8 @@ export function createSubmitScreen(opts: {
   /** Дані для відправки, крім полів форми. */
   collect: () => Omit<Submission, 'name' | 'stream' | 'submittedAt'>;
   onBack: () => void;
-  onDone: () => void;
+  /** Надіслано; id — заявка, на яку чекаємо рішення техпідтримки (null — без очікування). */
+  onDone: (id: string | null) => void;
 }) {
   const form = byId<HTMLFormElement>('submit-form');
   const name = byId<HTMLInputElement>('f-name');
@@ -74,13 +75,13 @@ export function createSubmitScreen(opts: {
     btnSubmit.disabled = true;
     btnLabel.textContent = t.submit.sending;
     try {
-      await submitResults({
+      const id = await submitResults({
         ...opts.collect(),
         name: v.name.trim().replace(/\s+/g, ' '),
         stream: v.stream.trim().replace(/\s+/g, ' '),
         submittedAt: new Date().toISOString(),
       }, config.submit);
-      opts.onDone();
+      opts.onDone(id);
     } catch (err) {
       console.error('Не вдалося надіслати результати', err);
       submitError.textContent = err instanceof SubmitServerError ? t.submit.sendServerError : t.submit.sendError;

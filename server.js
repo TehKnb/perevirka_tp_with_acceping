@@ -2,6 +2,8 @@
 // Railway сам ці функції не запускає: без сервера відправка результатів відповідає 405.
 // Токен бота береться зі змінних оточення (Railway → Variables), локально:
 //   node --env-file=.env.local server.js
+// Під час запуску реєструє вебхук Telegram для кнопок «Підтвердити» / «Відхилити»
+// (якщо задано TELEGRAM_WEBHOOK_URL і TELEGRAM_WEBHOOK_SECRET).
 
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
@@ -11,12 +13,16 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { gzip } from 'node:zlib';
+import { GET as reviewStatus } from './api/status.js';
 import { POST as submit } from './api/submit.js';
+import { registerWebhook, startPolling, POST as telegramWebhook } from './api/telegram.js';
 
 const gzipAsync = promisify(gzip);
 
 // Два файли по 4 МБ (ліміт у api/submit.js) плюс текстові поля форми.
 const MAX_SUBMIT_BYTES = 9 * 1024 * 1024;
+// Оновлення від Telegram — невеликий JSON.
+const MAX_WEBHOOK_BYTES = 1024 * 1024;
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -77,19 +83,30 @@ function toWebRequest(req, body) {
   }
   const forwarded = req.headers['x-forwarded-host'];
   const host = (typeof forwarded === 'string' && forwarded.split(',')[0]?.trim()) || req.headers.host || 'localhost';
-  return new Request(`http://${host}${req.url}`, { method: 'POST', headers, body });
+  return new Request(`http://${host}${req.url}`, { method: req.method, headers, body });
 }
 
-async function handleSubmit(req, res) {
-  const body = await readBody(req, MAX_SUBMIT_BYTES);
-  if (body === null) {
-    res.writeHead(413).end();
-    return;
+/** Функція з api/: тіло запиту (не більше limit) → Request, її Response → відповідь сервера. */
+async function runApi(handler, req, res, limit) {
+  let body;
+  if (req.method === 'POST') {
+    body = await readBody(req, limit);
+    if (body === null) {
+      res.writeHead(413).end();
+      return;
+    }
   }
-  const response = await submit(toWebRequest(req, body));
+  const response = await handler(toWebRequest(req, body));
   res.writeHead(response.status, Object.fromEntries(response.headers));
   res.end(Buffer.from(await response.arrayBuffer()));
 }
+
+/** Функції з api/: шлях → метод і обробник (ліміт тіла для POST). */
+const API_ROUTES = {
+  '/api/submit': { method: 'POST', handler: submit, limit: MAX_SUBMIT_BYTES },
+  '/api/telegram': { method: 'POST', handler: telegramWebhook, limit: MAX_WEBHOOK_BYTES },
+  '/api/status': { method: 'GET', handler: reviewStatus },
+};
 
 /** Замір віддачі (api/speedtest-upload.js): дані дочитуємо й відкидаємо, нічого не зберігаємо. */
 async function handleSpeedtestUpload(req, res) {
@@ -151,14 +168,15 @@ export function createAppServer({ root = fileURLToPath(new URL('./dist', import.
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
     const { pathname } = new URL(req.url, 'http://localhost');
     try {
-      if (pathname === '/api/submit' || pathname === '/api/speedtest-upload') {
-        if (req.method !== 'POST') {
-          res.writeHead(405, { Allow: 'POST' }).end();
-        } else if (pathname === '/api/submit') {
-          await handleSubmit(req, res);
-        } else {
-          await handleSpeedtestUpload(req, res);
-        }
+      const route = API_ROUTES[pathname];
+      if (route) {
+        if (req.method !== route.method) res.writeHead(405, { Allow: route.method }).end();
+        else await runApi(route.handler, req, res, route.limit);
+        return;
+      }
+      if (pathname === '/api/speedtest-upload') {
+        if (req.method !== 'POST') res.writeHead(405, { Allow: 'POST' }).end();
+        else await handleSpeedtestUpload(req, res);
         return;
       }
       await serveStatic(dir, gzipCache, req, res, pathname);
@@ -172,5 +190,10 @@ export function createAppServer({ root = fileURLToPath(new URL('./dist', import.
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT) || 3000;
-  createAppServer().listen(port, () => console.log(`Сервер працює на порту ${port}`));
+  createAppServer().listen(port, () => {
+    console.log(`Сервер працює на порту ${port}`);
+    // На Railway — вебхук; локально (без адреси вебхука) — опитування, якщо TELEGRAM_POLLING=1.
+    if (process.env.TELEGRAM_WEBHOOK_URL) void registerWebhook();
+    else if (process.env.TELEGRAM_POLLING === '1') void startPolling();
+  });
 }

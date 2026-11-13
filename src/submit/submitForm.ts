@@ -100,9 +100,10 @@ export class SubmitServerError extends Error {
 /**
  * Відправка результатів: форма з фото й аудіо йде на нашу функцію (api/submit.js),
  * а вона пересилає все в Telegram. Токен бота на сторінку не потрапляє.
+ * Повертає id заявки, за яким сторінка чекатиме рішення техпідтримки (null — сервер id не дав).
  * У тестовому режимі (config.submit.testMode) нічого не надсилається.
  */
-export async function submitResults(s: Submission, c: AppConfig['submit']): Promise<void> {
+export async function submitResults(s: Submission, c: AppConfig['submit']): Promise<string | null> {
   const shot = s.captures.screenshot;
   const audio = s.captures.audio;
   if (!shot || !audio) throw new Error('Немає фото або аудіо');
@@ -110,7 +111,7 @@ export async function submitResults(s: Submission, c: AppConfig['submit']): Prom
   if (c.testMode) {
     console.info('[Тестовий режим] Результати не надсилаються:', { name: s.name, stream: s.stream, summary: buildSummary(s) });
     await new Promise((r) => setTimeout(r, 600));
-    return;
+    return null;
   }
 
   const body = new FormData();
@@ -122,4 +123,6 @@ export async function submitResults(s: Submission, c: AppConfig['submit']): Prom
   body.append('audio', audio.blob, `audio.${audioExtension(audio.mime)}`);
   const res = await fetch(c.endpoint, { method: 'POST', body });
   if (!res.ok) throw new SubmitServerError(res.status);
+  const data = (await res.json().catch(() => ({}))) as { id?: unknown };
+  return typeof data.id === 'string' ? data.id : null;
 }

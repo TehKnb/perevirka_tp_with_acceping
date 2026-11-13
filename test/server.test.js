@@ -150,3 +150,21 @@ describe('server: файли сайту', () => {
     expect(await rawGet('/%E0%A4%A')).toBe(404);
   });
 });
+
+describe('server: заявки й вебхук Telegram', () => {
+  it('GET /api/status невідомої заявки — 404 unknown', async () => {
+    const res = await fetch(`${base}/api/status?id=nope`);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ status: 'unknown' });
+  });
+
+  it('POST /api/status — 405', async () => {
+    expect((await fetch(`${base}/api/status`, { method: 'POST' })).status).toBe(405);
+  });
+
+  it('вебхук без налаштувань — 503, GET — 405', async () => {
+    delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    expect((await fetch(`${base}/api/telegram`, { method: 'POST', body: '{}' })).status).toBe(503);
+    expect((await fetch(`${base}/api/telegram`)).status).toBe(405);
+  });
+});
